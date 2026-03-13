@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+paddleocr
+paddlepaddle
+python-multipart
+opencv-python-headless

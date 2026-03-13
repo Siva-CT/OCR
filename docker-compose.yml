@@ -1,0 +1,101 @@
+services:
+
+  api-gateway:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+      - ./schemas:/app/schemas
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./keys:/app/keys
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    environment:
+      - PADDLE_OCR_URL=http://paddle-ocr-service:8001/ocr
+      - TESSERACT_OCR_URL=http://tesseract-ocr-service:8002/ocr
+      - GOOGLE_VISION_URL=http://google-vision-service:8003/ocr
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/keys/google_vision_key.json
+    depends_on:
+      paddle-ocr-service:
+        condition: service_healthy
+      tesseract-ocr-service:
+        condition: service_healthy
+
+
+  paddle-ocr-service:
+    build:
+      context: ./containers/paddle
+      dockerfile: Dockerfile
+    environment:
+      - PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+      - FLAGS_enable_pir_api=0
+      - FLAGS_use_mkldnn=0
+    volumes:
+      - ./containers/paddle:/app
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+
+  tesseract-ocr-service:
+    build:
+      context: ./containers/tesseract
+      dockerfile: Dockerfile
+    volumes:
+      - ./containers/tesseract:/app
+    ports:
+      - "8002:8002"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+
+  google-vision-service:
+    build:
+      context: ./containers/googlevision
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./containers/googlevision:/app
+      - ./keys:/app/keys
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/keys/google_vision_key.json
+
+
+  frontend-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      # Serve static assets
+      - ./frontend:/usr/share/nginx/html
+      # Ensure custom reverse proxy config is used (otherwise default nginx drops /scan)
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      api-gateway:
+        condition: service_healthy

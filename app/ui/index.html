@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Label Processor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            text-align: center;
+            color: #38bdf8;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        input[type="file"],
+        select,
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background: #334155;
+            color: #f8fafc;
+            margin-top: 0.5rem;
+        }
+
+        button {
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background: #0284c7;
+        }
+
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+
+        #result-container {
+            margin-top: 2rem;
+        }
+
+        .label-tab {
+            margin-right: 8px;
+            margin-bottom: 8px;
+            padding: 8px 18px;
+            background: #334155;
+            color: #94a3b8;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .label-tab:hover,
+        .label-tab.active {
+            background: #0ea5e9;
+            color: #fff;
+            border-color: #0ea5e9;
+        }
+
+        .label-card {
+            margin-top: 1.2rem;
+            padding: 1.2rem 1.5rem;
+            background: #0f172a;
+            border-radius: 8px;
+            border: 1px solid #475569;
+        }
+
+        .label-card p {
+            margin: 0.4rem 0;
+            font-size: 0.95rem;
+            color: #e2e8f0;
+        }
+
+        .label-card p b {
+            color: #38bdf8;
+            display: inline-block;
+            min-width: 160px;
+        }
+
+        .label-meta {
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        pre {
+            margin: 0;
+            color: #a7f3d0;
+            font-family: monospace;
+        }
+
+        .loader {
+            border: 4px solid #334155;
+            border-top: 4px solid #38bdf8;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Document OCR Intelligence</h1>
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="image_file">Upload Label Image:</label>
+                <input type="file" id="image_file" name="image_file" accept=".png, .jpg, .jpeg" required>
+            </div>
+
+            <div class="form-group">
+                <label for="engine">Select OCR Engine:</label>
+                <select id="engine" name="engine" required>
+                    <option value="tesseract">Tesseract OCR</option>
+                    <option value="google_vision">Google Cloud Vision</option>
+                </select>
+            </div>
+
+            <button type="submit" id="submitBtn">Process Label</button>
+        </form>
+
+        <div class="loader" id="loader"></div>
+
+        <div id="result-container" style="display: none;">
+            <h3 style="color:#38bdf8; margin-bottom:1rem;">Extraction Results</h3>
+            <div id="label-meta" class="label-meta"></div>
+            <div id="label-tabs"></div>
+            <div id="label-content"></div>
+        </div>
+    </div>
+
+    <script>
+        function renderLabels(data) {
+            const tabs = document.getElementById("label-tabs");
+            const content = document.getElementById("label-content");
+            const meta = document.getElementById("label-meta");
+            const labels = data.labels || [];
+
+            tabs.innerHTML = "";
+            content.innerHTML = "";
+            meta.textContent = `Engine: ${data.engine_used || ""} · ${labels.length} label(s) found`;
+
+            if (labels.length === 0) {
+                content.innerHTML = `<p style="color:#94a3b8">No labels parsed.</p>`;
+                return;
+            }
+
+            labels.forEach((label, index) => {
+                const tab = document.createElement("button");
+                tab.innerText = `Label ${index + 1}`;
+                tab.className = "label-tab";
+                tab.dataset.index = index;
+                tab.onclick = () => {
+                    document.querySelectorAll(".label-tab").forEach(t => t.classList.remove("active"));
+                    tab.classList.add("active");
+                    showLabel(label);
+                };
+                tabs.appendChild(tab);
+                if (index === 0) { tab.classList.add("active"); showLabel(label); }
+            });
+        }
+
+        function showLabel(label) {
+            const content = document.getElementById("label-content");
+            const row = (key, val) => val ? `<p><b>${key}</b>${val}</p>` : "";
+            content.innerHTML = `
+                <div class="label-card">
+                    ${row("IBD No:", label.ibd_no)}
+                    ${row("Part Number:", label.part_number)}
+                    ${row("Description:", label.description)}
+                    ${row("Qty / Pack:", label.quantity_per_pack)}
+                    ${row("Total Quantity:", label.total_quantity)}
+                    ${row("Serial Number:", label.serial_number)}
+                    ${row("Vendor:", label.vendor_name)}
+                    ${row("Vendor ID:", label.vendor_id)}
+                    ${row("Invoice No:", label.supplier_invoice_number)}
+                    ${row("Invoice Date:", label.supplier_invoice_date)}
+                    ${row("Vendor Lot:", label.vendor_lot_number)}
+                    ${row("MSD Level:", label.msd_level)}
+                    ${row("MSD Date:", label.msd_date)}
+                </div>`;
+        }
+
+        document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const fileInput = document.getElementById("image_file");
+            const engineSelect = document.getElementById("engine");
+            const submitBtn = document.getElementById("submitBtn");
+            const loader = document.getElementById("loader");
+            const resultContainer = document.getElementById("result-container");
+
+            if (fileInput.files.length === 0) return alert("Please select a file.");
+
+            const formData = new FormData();
+            formData.append("image_file", fileInput.files[0]);
+            formData.append("engine", engineSelect.value);
+
+            submitBtn.disabled = true;
+            loader.style.display = "block";
+            resultContainer.style.display = "none";
+
+            try {
+                const response = await fetch("/process-label", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(text || "Error processing image");
+                }
+
+                const data = await response.json();
+                renderLabels(data);
+                resultContainer.style.display = "block";
+
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                document.getElementById("label-content").innerHTML =
+                    `<pre style="color:#fca5a5">Error: ${error.message || "Failed to fetch"}</pre>`;
+                resultContainer.style.display = "block";
+            } finally {
+                submitBtn.disabled = false;
+                loader.style.display = "none";
+            }
+        });
+    </script>
+
+</body>
+
+</html>

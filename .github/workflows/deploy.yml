@@ -1,0 +1,94 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: your-gcp-project-id
+  REGION: us-central1
+  GAR_LOCATION: us-central1-docker.pkg.dev/your-gcp-project-id/warehouse-scanner
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+
+    - name: Google Auth
+      id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider'
+        service_account: 'my-service-account@your-gcp-project-id.iam.gserviceaccount.com'
+
+    - name: Docker Auth
+      run: |-
+        gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev"
+
+    - name: Build and Push API Gateway
+      run: |-
+        docker build -t "${{ env.GAR_LOCATION }}/api-gateway:${{ github.sha }}" ./api
+        docker push "${{ env.GAR_LOCATION }}/api-gateway:${{ github.sha }}"
+
+    - name: Deploy API Gateway to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v2
+      with:
+        service: api-gateway
+        region: ${{ env.REGION }}
+        image: ${{ env.GAR_LOCATION }}/api-gateway:${{ github.sha }}
+
+    - name: Build and Push PaddleOCR Service
+      run: |-
+        docker build -t "${{ env.GAR_LOCATION }}/paddle-ocr-service:${{ github.sha }}" ./containers/paddle
+        docker push "${{ env.GAR_LOCATION }}/paddle-ocr-service:${{ github.sha }}"
+
+    - name: Deploy PaddleOCR Service to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v2
+      with:
+        service: paddle-ocr-service
+        region: ${{ env.REGION }}
+        image: ${{ env.GAR_LOCATION }}/paddle-ocr-service:${{ github.sha }}
+
+    - name: Build and Push TesseractOCR Service
+      run: |-
+        docker build -t "${{ env.GAR_LOCATION }}/tesseract-ocr-service:${{ github.sha }}" ./containers/tesseract
+        docker push "${{ env.GAR_LOCATION }}/tesseract-ocr-service:${{ github.sha }}"
+
+    - name: Deploy TesseractOCR Service to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v2
+      with:
+        service: tesseract-ocr-service
+        region: ${{ env.REGION }}
+        image: ${{ env.GAR_LOCATION }}/tesseract-ocr-service:${{ github.sha }}
+
+    - name: Build and Push Google Vision Service
+      run: |-
+        docker build -t "${{ env.GAR_LOCATION }}/google-vision-service:${{ github.sha }}" ./containers/googlevision
+        docker push "${{ env.GAR_LOCATION }}/google-vision-service:${{ github.sha }}"
+
+    - name: Deploy Google Vision Service to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v2
+      with:
+        service: google-vision-service
+        region: ${{ env.REGION }}
+        image: ${{ env.GAR_LOCATION }}/google-vision-service:${{ github.sha }}
+
+    - name: Build and Push Frontend
+      run: |-
+        docker build -t "${{ env.GAR_LOCATION }}/frontend-ui:${{ github.sha }}" ./frontend
+        docker push "${{ env.GAR_LOCATION }}/frontend-ui:${{ github.sha }}"
+
+    - name: Deploy Frontend to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v2
+      with:
+        service: frontend-ui
+        region: ${{ env.REGION }}
+        image: ${{ env.GAR_LOCATION }}/frontend-ui:${{ github.sha }}
+        flags: '--allow-unauthenticated'
