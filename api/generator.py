@@ -140,25 +140,20 @@ def build_minda_label_fields(ocr_vendor_name: str, quantity: object, vendor_lot:
 
 
 def generate_qr_payload(label_fields: Dict[str, object]) -> str:
-    description_lines = label_fields.get("description_lines", [])
-    if isinstance(description_lines, list) and description_lines:
-        description_value = "\n".join([str(line) for line in description_lines if line]).strip() or ""
-    else:
-        description_value = str(label_fields.get("description") or "")
-
-    payload = {
-        "IBD_No": str(label_fields.get("ibd_no") or ""),
-        "Part": str(label_fields.get("part") or ""),
-        "Description": description_value,
-        "Qty": str(label_fields.get("qty_display", label_fields.get("qty") or "") or ""),
-        "Vendor": str(label_fields.get("vendor_display") or ""),
-        "Vendor_Code": str(label_fields.get("vendor_code") or ""),
-        "Vendor_Lot": str(label_fields.get("vendor_lot") or ""),
-        "Supplier_Invoice": str(label_fields.get("supplier_invoice") or ""),
-        "MSD_Level": str(label_fields.get("msd_level") or ""),
-        "MSD_Date": str(label_fields.get("msd_date") or ""),
-    }
-    return json.dumps(payload, separators=(",", ":"), ensure_ascii=True)
+    unique_number = label_fields.get("reference_number") or label_fields.get("barcode_number") or ""
+    part_number = label_fields.get("part") or ""
+    lot_number = label_fields.get("vendor_lot") or ""
+    quantity = label_fields.get("qty") or ""
+    msd_number = label_fields.get("msd_level") or ""
+    vendor_code = label_fields.get("vendor_code") or ""
+    return generate_datamatrix_string(
+        str(unique_number),
+        str(part_number),
+        str(lot_number),
+        str(quantity),
+        str(msd_number),
+        str(vendor_code),
+    )
 
 
 def generate_zpl(qr_payload: str, label_fields: Dict[str, object], barcode_number: str) -> str:
@@ -185,7 +180,7 @@ def generate_zpl(qr_payload: str, label_fields: Dict[str, object], barcode_numbe
 ^FO50,230^GB700,1,1^FS
 
 ^FX Bottom Info
-^FO50,245^A0N,40,40^FD{barcode_number}^FS
+^FO50,245^A0N,40,40^FB700,1,0,L^FD{barcode_number}^FS
 ^FO50,285^A0N,30,30^FDVendor : {label_fields.get('vendor_code', '-')} / {label_fields.get('vendor_display', '-')}^FS
 ^FO50,315^A0N,30,30^FDSupplier Invoice : {label_fields.get('supplier_invoice', '-')}^FS
 ^FO50,345^A0N,30,30^FDVen Lot No : {label_fields.get('vendor_lot', '-')}^FS
