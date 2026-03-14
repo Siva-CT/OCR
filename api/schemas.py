@@ -25,7 +25,7 @@ DEFAULT_PATTERNS = {
 DEFAULT_KEYWORDS = {
     "part_number": ["PART NUMBER", "PART NUMGER", "PART NO", "PART", "MPN", "P/N", "PN", "PIN", "P"],
     "quantity": ["QUANTITY", "QTY", "Q", "GTY", "OTY"],
-    "vendor_lot": ["VEN LOT NO", "LOT NUMBER", "LOT NO", "LOT", "1T", "1P"],
+    "vendor_lot": ["VEN LOT NO", "LOT NUMBER", "LOT NO", "LOT", "1T"],
     "date_code": ["DATE CODE", "DATE", "DC", "D/C", "DIC", "D"],
 }
 
@@ -460,7 +460,7 @@ def _extract_jauch_fields(raw_text: str) -> Dict[str, str]:
         result["quantity"] = m_q.group(1).strip()
         log(f"Jauch (Q/0) quantity: {result['quantity']}")
 
-    m_1t = re.search(r"\(1T\)\s*([A-Z0-9][A-Z0-9\-]*)", text)
+    m_1t = re.search(r"\(1T\)\s*([0-9]+)", text, re.IGNORECASE)
     if m_1t:
         candidate = m_1t.group(1).strip()
         if candidate not in {"LOT", "L0T"}:
