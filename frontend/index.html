@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Label Scanner</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bwip-js/3.0.4/bwip-js-min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Warehouse Scanner Pro</h1>
+        </header>
+
+        <main class="main-content">
+            <!-- Camera Section -->
+            <section class="camera-section card">
+                <h2>Live Capture</h2>
+                <div class="video-container">
+                    <video id="camera-stream" autoplay playsinline></video>
+                    <canvas id="capture-canvas" style="display:none;"></canvas>
+                    <div id="camera-overlay" class="overlay">
+                        <p>Align Label Here</p>
+                        <div class="scanner-frame"></div>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button id="start-btn" class="btn primary">Start Camera</button>
+                    <button id="capture-btn" class="btn success" disabled>Take Photo</button>
+                </div>
+                <div id="status-indicator" class="status-indicator">Ready</div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section card">
+                <h2>Label Preview</h2>
+
+                <div id="empty-state" class="empty-state">
+                    <p>No label scanned yet. Please capture an image to generate the preview.</p>
+                </div>
+
+                <!-- Digital Label Preview -->
+                <div id="label-preview" class="label-preview hidden">
+                    <div class="label-box">
+                        <div class="label-top">
+                            <div class="barcode-container">
+                                <canvas id="datamatrix-canvas"></canvas>
+                            </div>
+                            <div class="text-info-right">
+                                <p class="bold-text">IBD No# : <span id="lbl-ibd">XXXXX</span></p>
+                                <p class="bold-text">Part : <span id="lbl-part">XXXXX</span></p>
+                                <p id="lbl-desc">Description</p>
+                                <p class="bold-text">QTY : <span id="lbl-qty">XXXX / XXXX EA</span></p>
+                            </div>
+                        </div>
+                        <div class="divider"></div>
+                        <div class="label-bottom">
+                            <p class="hu-text" id="lbl-hu">100000100000000000</p>
+                            <p>Vendor : <span id="lbl-vendor">XXXX / XXXX</span></p>
+                            <p>Supplier Invoice : <span id="lbl-invoice">XXXX / XXXX</span></p>
+                            <p>Ven Lot No : <span id="lbl-lot">XXXX</span></p>
+                            <p>MSD Level : <span id="lbl-msd">X</span> &nbsp;&nbsp; MSD Date : <span
+                                    id="lbl-msd-date">XXXXX</span></p>
+                        </div>
+                    </div>
+
+                    <div class="meta-info">
+                        <h3>Scan Metadata</h3>
+                        <p>Engine Used: <span id="meta-engine">-</span></p>
+                        <p>Processing Time: <span id="meta-time">-</span></p>
+                        <button id="download-json" class="btn outline mt-4">Download JSON</button>
+                        <button id="download-zpl" class="btn secondary mt-4">Copy ZPL</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

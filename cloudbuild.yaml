@@ -1,0 +1,31 @@
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+
+# Build Paddle OCR
+- name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'build',
+    '-t',
+    'us-central1-docker.pkg.dev/$PROJECT_ID/ocr-repo/paddle-ocr',
+    './containers/paddle'
+  ]
+
+# Push Paddle OCR
+- name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'push',
+    'us-central1-docker.pkg.dev/$PROJECT_ID/ocr-repo/paddle-ocr'
+  ]
+
+# Deploy Paddle OCR
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args: [
+    'run','deploy','paddle-ocr-service',
+    '--image','us-central1-docker.pkg.dev/$PROJECT_ID/ocr-repo/paddle-ocr',
+    '--region','us-central1',
+    '--platform','managed',
+    '--allow-unauthenticated'
+  ]

@@ -1,0 +1,16 @@
+﻿fastapi
+uvicorn
+python-multipart
+httpx
+opencv-python-headless
+numpy
+ultralytics
+pandas
+openpyxl
+pydantic
+google-cloud-vision
+pytesseract
+Pillow
+paddleocr
+paddlepaddle
+

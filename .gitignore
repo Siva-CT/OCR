@@ -1,0 +1,14 @@
+keys/
+*.json
+.env
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+**pycache**/
+*.pyc
+logs/
+*.log
+node_modules/
