@@ -269,7 +269,7 @@ video {
 .label-box {
     background-color: var(--label-bg);
     color: var(--label-text);
-    padding: 1.5rem;
+    padding: 1.25rem;
     border-radius: 4px;
     font-family: monospace;
     font-size: 14px;
@@ -279,18 +279,18 @@ video {
 
 .label-bottom p,
 .text-info-right p {
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .label-top {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
 }
 
 .barcode-container {
-    width: 120px;
-    height: 120px;
+    width: 105px;
+    height: 105px;
 }
 
 .barcode-container canvas {
@@ -310,7 +310,7 @@ video {
 }
 
 .divider {
-    height: 2px;
+    height: 1px;
     background-color: var(--label-text);
     margin: 1rem 0;
 }
@@ -318,7 +318,10 @@ video {
 .hu-text {
     font-size: 24px;
     font-weight: bold;
-    text-align: center;
+    text-align: left;
+    margin-left: 0;
+    padding-left: 0;
+    width: 100%;
     margin: 10px 0 15px 0 !important;
 }
 

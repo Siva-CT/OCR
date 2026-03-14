@@ -21,7 +21,7 @@ from schemas import (
     sanitize_structured_fields,
     save_generated_schema,
 )
-from generator import generate_datamatrix_string, generate_hu_number, generate_ibd_number, generate_zpl
+from generator import build_minda_label_fields, generate_hu_number, generate_qr_payload, generate_zpl
 from db import ensure_dirs, save_scan
 
 app = FastAPI(title="Warehouse Label Scanner API Gateway")
@@ -579,38 +579,23 @@ async def scan_label(
             "msd_date": "-",
         }
 
-        hu_number = generate_hu_number()
-        ibd_number = generate_ibd_number()
-        msd_level = "0"
-        vendor_code = structured_data.get("vendor", "UNK")
-        datamatrix_str = generate_datamatrix_string(
-            hu_number,
-            structured_data.get("part_number", "-"),
-            structured_data.get("vendor_lot", "-"),
-            structured_data.get("quantity", "-"),
-            msd_level,
-            vendor_code,
-        )
-        zpl_code = generate_zpl(
-            datamatrix_str,
-            ibd_number,
-            structured_data.get("part_number", "-"),
-            structured_data.get("description", "-"),
-            structured_data.get("quantity", "-"),
-            "EA",
-            hu_number,
+        label_fields = build_minda_label_fields(
             structured_data.get("vendor", "UNKNOWN"),
-            "",
+            structured_data.get("quantity", "-"),
             structured_data.get("vendor_lot", "-"),
-            msd_level,
-            structured_data.get("date_code", "-"),
         )
+        qr_payload = generate_qr_payload(label_fields)
+        reference_number = label_fields.get("reference_number", "-")
+        label_fields["barcode_number"] = reference_number
+        label_fields["qr_payload"] = qr_payload
+        zpl_code = generate_zpl(qr_payload, label_fields, reference_number)
 
-        structured_data["hu"] = hu_number
-        structured_data["ibd"] = ibd_number
+        structured_data["hu"] = reference_number
+        structured_data["ibd"] = label_fields.get("ibd_no", "-")
         structured_data["engine_used"] = selected_engine
-        structured_data["datamatrix"] = datamatrix_str
+        structured_data["datamatrix"] = qr_payload
         structured_data["zpl"] = zpl_code
+        structured_data["label_fields"] = label_fields
 
         processing_time = time.time() - start_time
 
@@ -661,13 +646,17 @@ async def scan_label(
             confidence=confidence,
             processing_time=processing_time,
         )
-        
+
+        response_payload["label_fields"] = label_fields
+
         response_payload["debug"] = {
             "detections_count": len(detections),
             "roi_count": len(rois),
             "ocr_engine": selected_engine,
             "ocr_text": structured_data.get("raw_text", "")
         }
+
+        
         
         log(f"Response ready in {processing_time:.2f}s using {selected_engine}")
         return response_payload
@@ -676,6 +665,11 @@ async def scan_label(
     except Exception as e:
         print(f"Unhandled scan error: {e}")
         return fallback_payload()
+
+
+
+
+
 
 
 

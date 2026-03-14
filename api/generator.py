@@ -1,47 +1,198 @@
+import json
+import re
 import time
 import subprocess
+from typing import Dict, List
+
+KEMET_TEMPLATE = {
+    "ibd_no": "185101626",
+    "part": "E02-00463-0104-A",
+    "description_lines": [
+        "CAPACITOR,0.1UF/50,0805,FLOATING",
+        "ELECTR",
+        "DOL",
+    ],
+    "vendor_code": "900100576",
+    "vendor_display": "AVNET ASIA PTE",
+    "supplier_invoice": "1182614732/21.01.2026",
+    "msd_level": "1",
+    "msd_date": "00000000",
+    "reference_number": "100000100018320103",
+    "pack_qty": "1500000",
+}
+
+JAUCH_TEMPLATE = {
+    "ibd_no": "185099607",
+    "part": "E26-05166-S53P-A",
+    "description_lines": [
+        "CRYSTAL 8MHz JAUCH",
+        "JXS53P4-10-20/20-T1",
+    ],
+    "vendor_code": "900407545",
+    "vendor_display": "PERFECT SALES E",
+    "supplier_invoice": "WHM001/252604102/31.01.2026",
+    "msd_level": "1",
+    "msd_date": "00000000",
+    "reference_number": "100000100018328942",
+    "pack_qty": "30000",
+}
+
+TEMPLATES = {
+    "KEMET": KEMET_TEMPLATE,
+    "JAUCH": JAUCH_TEMPLATE,
+}
+
+DEFAULT_TEMPLATE_VENDOR = "KEMET"
+
 
 def generate_hu_number() -> str:
     prefix = "10000010"
     timestamp_part = str(int(time.time() * 100))[-10:]
     hu = f"{prefix}{timestamp_part}"
-    result = hu[:18].ljust(18, '0')
+    result = hu[:18].ljust(18, "0")
     assert len(result) == 18, f"Generated HU should be 18 chars, got {len(result)}"
     return result
+
 
 def generate_ibd_number() -> str:
     prefix = "IBD"
     timestamp_part = str(int(time.time() * 1000))[-10:]
     return f"{prefix}{timestamp_part}"
 
+
 def generate_datamatrix_string(hu, part, vendor_lot, scanned_qty, msd_level, vendor_code) -> str:
     return f"RID{hu}PRN{part}LOT{vendor_lot}QTY{scanned_qty}MSD{msd_level}VEN{vendor_code}"
 
-def generate_zpl(datamatrix_string, ibd, part, description, qty, uom, hu, vendor, invoice, lot, msd_level, msd_date) -> str:
-    desc_short = (description[:37] + '...') if len(description) > 40 else description
+
+def _normalize_quantity(value: object) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return str(value)
+    text = str(value).strip()
+    if not text:
+        return "-"
+    if re.fullmatch(r"\d+\.0+", text):
+        return text.split(".")[0]
+    return text
+
+
+def detect_vendor_template(ocr_vendor_name: str) -> str:
+    normalized = str(ocr_vendor_name or "").upper()
+    if "KEMET" in normalized:
+        return "KEMET"
+    if "JAUCH" in normalized:
+        return "JAUCH"
+    return "UNKNOWN"
+
+
+def build_minda_label_fields(ocr_vendor_name: str, quantity: object, vendor_lot: object) -> Dict[str, object]:
+    detected_vendor = detect_vendor_template(ocr_vendor_name)
     
+    if detected_vendor == "UNKNOWN":
+        return {
+            "template_vendor": "UNKNOWN",
+            "ibd_no": "",
+            "part": "",
+            "description_lines": [],
+            "description": "",
+            "qty": "",
+            "qty_display": "",
+            "pack_qty": "",
+            "vendor_code": "",
+            "vendor_display": "",
+            "vendor_lot": "",
+            "supplier_invoice": "",
+            "msd_level": "",
+            "msd_date": "",
+            "reference_number": "",
+        }
+
+    template_vendor = detected_vendor if detected_vendor in TEMPLATES else DEFAULT_TEMPLATE_VENDOR
+    template = TEMPLATES[template_vendor]
+
+    qty_value = _normalize_quantity(quantity)
+    vendor_lot_value = str(vendor_lot or "-").strip() or "-"
+    description_lines = list(template["description_lines"])
+    description_payload = "\n".join([line for line in description_lines if line]).strip() or "-"
+    pack_qty = str(template.get("pack_qty", "-") or "-")
+    qty_display = f"{qty_value} /{pack_qty} EA" if qty_value != "-" and pack_qty != "-" else qty_value
+
+    return {
+        "template_vendor": template_vendor,
+        "ibd_no": template["ibd_no"],
+        "part": template["part"],
+        "description_lines": description_lines,
+        "description": description_payload,
+        "qty": qty_value,
+        "qty_display": qty_display,
+        "pack_qty": pack_qty,
+        "vendor_code": template["vendor_code"],
+        "vendor_display": template["vendor_display"],
+        "vendor_lot": vendor_lot_value,
+        "supplier_invoice": template["supplier_invoice"],
+        "msd_level": template["msd_level"],
+        "msd_date": template["msd_date"],
+        "reference_number": template["reference_number"],
+    }
+
+
+def generate_qr_payload(label_fields: Dict[str, object]) -> str:
+    description_lines = label_fields.get("description_lines", [])
+    if isinstance(description_lines, list) and description_lines:
+        description_value = "\n".join([str(line) for line in description_lines if line]).strip() or ""
+    else:
+        description_value = str(label_fields.get("description") or "")
+
+    payload = {
+        "IBD_No": str(label_fields.get("ibd_no") or ""),
+        "Part": str(label_fields.get("part") or ""),
+        "Description": description_value,
+        "Qty": str(label_fields.get("qty_display", label_fields.get("qty") or "") or ""),
+        "Vendor": str(label_fields.get("vendor_display") or ""),
+        "Vendor_Code": str(label_fields.get("vendor_code") or ""),
+        "Vendor_Lot": str(label_fields.get("vendor_lot") or ""),
+        "Supplier_Invoice": str(label_fields.get("supplier_invoice") or ""),
+        "MSD_Level": str(label_fields.get("msd_level") or ""),
+        "MSD_Date": str(label_fields.get("msd_date") or ""),
+    }
+    return json.dumps(payload, separators=(",", ":"), ensure_ascii=True)
+
+
+def generate_zpl(qr_payload: str, label_fields: Dict[str, object], barcode_number: str) -> str:
+    description_lines: List[str] = list(label_fields.get("description_lines", []))
+    desc_line_1 = description_lines[0] if len(description_lines) > 0 else "-"
+    desc_line_2 = description_lines[1] if len(description_lines) > 1 else ""
+    desc_line_3 = description_lines[2] if len(description_lines) > 2 else ""
+    qty_display = label_fields.get("qty_display", label_fields.get("qty", "-"))
+
     zpl = f"""^XA
-^FX DataMatrix Barcode
-^FO50,50^BXN,10,200,0,0,1,~
-^FD{datamatrix_string}^FS
+^FX QR Code
+^FO50,50^BQN,2,5
+^FDLA,{qr_payload}^FS
 
 ^FX Text Info Right Side
-^FO350,50^A0N,30,30^FDIBD No# : {ibd}^FS
-^FO350,90^A0N,30,30^FDPart : {part}^FS
-^FO350,130^A0N,30,30^FD{desc_short}^FS
-^FO350,170^A0N,30,30^FDQTY : {qty} / {qty} {uom}^FS
+^FO350,50^A0N,30,30^FDIBD No : {label_fields.get('ibd_no', '-')}^FS
+^FO350,90^A0N,30,30^FDPart : {label_fields.get('part', '-')}^FS
+^FO350,130^A0N,30,30^FD{desc_line_1}^FS
+^FO350,155^A0N,30,30^FD{desc_line_2}^FS
+^FO350,180^A0N,30,30^FD{desc_line_3}^FS
+^FO350,205^A0N,30,30^FDQTY:{qty_display}^FS
 
 ^FX Divider
-^FO50,220^GB700,3,3^FS
+^FO50,230^GB700,1,1^FS
 
 ^FX Bottom Info
-^FO300,240^A0N,40,40^FD{hu}^FS
-^FO50,300^A0N,30,30^FDVendor : {vendor}^FS
-^FO50,340^A0N,30,30^FDSupplier Invoice : {invoice}^FS
-^FO50,380^A0N,30,30^FDVen Lot No : {lot}^FS
-^FO50,420^A0N,30,30^FDMSD Level : {msd_level}   MSD Date : {msd_date}^FS
+^FO50,245^A0N,40,40^FD{barcode_number}^FS
+^FO50,285^A0N,30,30^FDVendor : {label_fields.get('vendor_code', '-')} / {label_fields.get('vendor_display', '-')}^FS
+^FO50,315^A0N,30,30^FDSupplier Invoice : {label_fields.get('supplier_invoice', '-')}^FS
+^FO50,345^A0N,30,30^FDVen Lot No : {label_fields.get('vendor_lot', '-')}^FS
+^FO50,375^A0N,30,30^FDMSD Level : {label_fields.get('msd_level', '-')}   MSD Date : {label_fields.get('msd_date', '-')}^FS
 ^XZ"""
     return zpl
+
 
 def print_label(zpl_code):
     import platform
@@ -67,3 +218,4 @@ def print_label(zpl_code):
     except Exception as e:
         print(f"Print failed: {e}")
         return False
+

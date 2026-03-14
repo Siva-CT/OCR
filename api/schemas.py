@@ -1,11 +1,8 @@
-d{15,20}\b",
-    "supplier_invoice": r"SUPPLIER\s*INVOICE\s*[:\-]?\s*(\S+)",
-    "ven_lot_no": r"VEN\s*LOT\s*NO\s*[:\-]?\s*(\S+)",
-    "msd_level": r"MSD\import difflib
 import json
 import os
 import re
 import time
+import difflib
 from typing import Any, Dict, List
 
 SCHEMA_DIR = os.environ.get("SCHEMA_DIR", "/app/schemas")
@@ -18,7 +15,7 @@ DEFAULT_SCHEMA_PATTERNS = {
 
 DEFAULT_PATTERNS = {
     "part_number": r"(?:PART\s*NUMBER[:\s]*([A-Z0-9-]+))|(?:PART(?:\s*(?:NO|NUMBER|NUMGER))?|MPN|P/?N|PIN|KEMET\s*P/?N)\s*[:#.\-]?\s*([A-Z0-9-]{6,25})",
-    "quantity": r"(?:QUANTITY[:\s]*(\d+))|(?:QTY|QUANTITY|GTY|OTY|\s*[:#.\-]?\s*(\d{1,8})\s*(?:ST|PCS|EA)?",
+    "quantity": r"QTY\s*[:-]?\s*(\d+)",
     "vendor_lot": r"(?:(?:LOT|L0T)\s*[:\-]?\s*(\d{6,12}))|(?:VEN\s*LOT\s*NO|LOT\s*NUMBER|LOT\s*NO|LOTNO|LOT)\s*[:#.\-]?\s*([A-Z0-9-]{4,25})",
     "date_code": r"(?:DATE\s*CODE[:\s]*(\d{4}))|(?:DATE\s*CODE|DATECODE|DC|D/C|DIC|DATE|D)\s*[:#.\-]?\s*([\d.\-/]{2,10})",
     "capacitance": r"(\d+\s*UF)",
@@ -315,7 +312,7 @@ def _extract_part_value(value: str) -> str:
 
 def _extract_quantity_value(value: str) -> str:
     cleaned = _clean_candidate_text(value)
-    match = re.search(r"(?:QTY|QUANTITY|Q)\s*[:\-]?\s*(\d+)", cleaned)
+    match = re.search(r"QTY\s*[:-]?\s*(\d+)", cleaned)
     if match:
         return match.group(1)
     match = QUANTITY_VALUE_PATTERN.search(cleaned)

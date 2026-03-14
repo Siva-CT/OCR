@@ -180,31 +180,54 @@ function renderPreview(data) {
 
     const parsed = data.parsed || {};
     const structured = data.structured_data || {};
+    const labelFields = data.label_fields || structured.label_fields || {};
 
-    document.getElementById('lbl-part').textContent = parsed.part || structured.part_number || '-';
-    document.getElementById('lbl-qty').textContent = parsed.qty || structured.quantity || '-';
-    document.getElementById('lbl-lot').textContent = parsed.ven_lot_no || structured.vendor_lot || '-';
-    document.getElementById('lbl-vendor').textContent = parsed.vendor || structured.vendor || 'UNKNOWN';
-    document.getElementById('lbl-desc').textContent = structured.description || '-';
-    document.getElementById('lbl-hu').textContent = parsed.barcode || structured.hu || '-';
-    document.getElementById('lbl-ibd').textContent = parsed.ibd_no || structured.ibd || '-';
+    const partValue = labelFields.part || parsed.part || structured.part_number || '-';
+    const qtyValue = labelFields.qty || parsed.qty || structured.quantity || '-';
+    const packQty = labelFields.pack_qty;
+    const qtyDisplay = labelFields.qty_display || ((packQty && qtyValue !== "-") ? `${qtyValue} /${packQty} EA` : qtyValue);
+    const lotValue = labelFields.vendor_lot || parsed.ven_lot_no || structured.vendor_lot || '-';
+    const ibdValue = labelFields.ibd_no || parsed.ibd_no || structured.ibd || '-';
+    const huValue = labelFields.barcode_number || parsed.barcode || structured.hu || '-';
+    const invoiceValue = labelFields.supplier_invoice || parsed.supplier_invoice || structured.supplier_invoice || '-';
+    const msdLevelValue = labelFields.msd_level || parsed.msd_level || structured.msd_level || '-';
+    const msdDateValue = labelFields.msd_date || parsed.msd_date || structured.msd_date || '-';
 
-    document.getElementById('lbl-invoice').textContent = parsed.supplier_invoice || structured.supplier_invoice || '-';
-    document.getElementById('lbl-msd').textContent = parsed.msd_level || structured.msd_level || '-';
-    document.getElementById('lbl-msd-date').textContent = parsed.msd_date || structured.msd_date || '-';
+    const vendorText = (labelFields.vendor_code && labelFields.vendor_display)
+        ? `${labelFields.vendor_code} / ${labelFields.vendor_display}`
+        : (parsed.vendor || structured.vendor || 'UNKNOWN');
+
+    const descriptionLines = Array.isArray(labelFields.description_lines) && labelFields.description_lines.length
+        ? labelFields.description_lines
+        : [structured.description || '-'];
+
+    document.getElementById('lbl-part').textContent = partValue;
+    document.getElementById('lbl-qty').textContent = qtyDisplay;
+    document.getElementById('lbl-lot').textContent = lotValue;
+    document.getElementById('lbl-vendor').textContent = vendorText;
+    document.getElementById('lbl-desc-1').textContent = descriptionLines[0] || '-';
+    document.getElementById('lbl-desc-2').textContent = descriptionLines[1] || '';
+    document.getElementById('lbl-desc-3').textContent = descriptionLines[2] || '';
+    document.getElementById('lbl-hu').textContent = huValue;
+    document.getElementById('lbl-ibd').textContent = ibdValue;
+
+    document.getElementById('lbl-invoice').textContent = invoiceValue;
+    document.getElementById('lbl-msd').textContent = msdLevelValue;
+    document.getElementById('lbl-msd-date').textContent = msdDateValue;
 
     document.getElementById('meta-engine').textContent = data.meta.engine_used;
     document.getElementById('meta-time').textContent = data.meta.processing_time;
 
     try {
-        bwipjs.toCanvas('datamatrix-canvas', {
-            bcid: 'datamatrix',
-            text: structured.datamatrix || `PRN${parsed.part || structured.part_number || '-'}LOT${parsed.ven_lot_no || structured.vendor_lot || '-'}QTY${parsed.qty || structured.quantity || '-'}`,
-            scale: 3,
-            height: 10,
-            width: 10,
+        const qrPayload = labelFields.qr_payload
+            || structured.datamatrix
+            || `PRN${partValue}LOT${lotValue}QTY${qtyValue}`;
+        bwipjs.toCanvas('qr-canvas', {
+            bcid: 'qrcode',
+            text: qrPayload,
+            scale: 2,
+            eclevel: 'L',
             includetext: false,
-            textxalign: 'center',
         });
     } catch (e) {
         console.error("Barcode generation error:", e);
@@ -214,6 +237,7 @@ function renderPreview(data) {
         raw_text: data.raw_text || structured.raw_text || '',
         blocks: data.blocks || [],
         parsed,
+        label_fields: labelFields,
         structured_data: structured,
     };
 }
@@ -246,3 +270,5 @@ document.getElementById('download-zpl').addEventListener('click', async () => {
         statusInd.textContent = 'ZPL downloaded';
     }
 });
+
+
